@@ -1,0 +1,108 @@
+# =========================
+# Python
+# =========================
+venv/
+env/
+.venv/
+ENV/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+
+# Distribution / packaging
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Environment variables
+.env
+.env.local
+*.env
+
+# =========================
+# Dataset (generated during training)
+# =========================
+backend/data/*.npz
+backend/data/combined_dataset.npz
+
+# =========================
+# Logs
+# =========================
+backend/logs/
+*.log
+logs/
+
+# =========================
+# Node.js
+# =========================
+frontend/node_modules/
+node_modules/
+frontend/dist/
+dist/
+
+# npm debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# =========================
+# OS Generated
+# =========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# =========================
+# Jupyter Notebooks
+# =========================
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# =========================
+# Testing
+# =========================
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Timestamped model backups (keep only the main model)
+backend/models/equation_solver_model_*.h5
+!backend/models/equation_solver_model.h5
+
+# =========================
+# NOTE: The following are INCLUDED (not ignored)
+# =========================
+# - backend/models/equation_solver_model.h5 (pre-trained model)
+# - All source code files
+# - requirements.txt
+# - package.json
+
