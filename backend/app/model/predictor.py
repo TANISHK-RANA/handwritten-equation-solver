@@ -160,9 +160,97 @@ class EquationPredictor:
         """
         predictions = self.predict_batch(char_images)
         
+        # Apply context-aware post-processing to fix common confusions
+        predictions = self._apply_context_corrections(predictions, char_images)
+        
         equation_string = ''.join([char for char, _ in predictions])
         
         return equation_string, predictions
+    
+    def _apply_context_corrections(self, predictions: List[Tuple[str, float]], 
+                                   char_images: List[np.ndarray]) -> List[Tuple[str, float]]:
+        """
+        Apply context-aware corrections for common confusions like 1 vs /.
+        
+        The model often confuses '/' with '1' because they look similar.
+        This function uses context (surrounding characters) to correct this.
+        """
+        if len(predictions) < 3:
+            return predictions
+        
+        corrected = list(predictions)
+        digits = set('0123456789')
+        
+        for i in range(1, len(predictions) - 1):
+            char, confidence = predictions[i]
+            prev_char = predictions[i - 1][0]
+            next_char = predictions[i + 1][0]
+            
+            # If we have digit-1-digit pattern, check if '1' might be '/'
+            if char == '1' and prev_char in digits and next_char in digits:
+                # Check the shape of the character - '/' is typically more diagonal
+                if self._is_likely_slash(char_images[i]):
+                    # Replace with '/' 
+                    corrected[i] = ('/', confidence)
+            
+            # If we have digit-1 at end and 1 looks diagonal, might be operator confusion
+            # This handles cases like "51" which might be "5/" (incomplete equation)
+        
+        return corrected
+    
+    def _is_likely_slash(self, image: np.ndarray) -> bool:
+        """
+        Analyze if an image is more likely to be a slash than a 1.
+        
+        Slashes typically:
+        - Have a more diagonal orientation
+        - Are wider relative to their height
+        - Don't have a horizontal base or serif
+        """
+        import cv2
+        
+        # Ensure grayscale
+        if len(image.shape) == 3:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = image.copy()
+        
+        # Threshold
+        _, binary = cv2.threshold(gray, 30, 255, cv2.THRESH_BINARY)
+        
+        # Find contours
+        contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        if not contours:
+            return False
+        
+        # Get the largest contour
+        largest = max(contours, key=cv2.contourArea)
+        
+        # Fit a line to the contour points
+        if len(largest) >= 5:
+            # Get bounding rectangle
+            x, y, w, h = cv2.boundingRect(largest)
+            
+            # Calculate aspect ratio
+            aspect_ratio = w / h if h > 0 else 0
+            
+            # Slashes tend to be wider (more diagonal) than 1s
+            # A vertical '1' has low aspect ratio, a diagonal '/' has higher
+            if aspect_ratio > 0.3:  # If width is more than 30% of height
+                return True
+            
+            # Also check the angle using fitLine
+            try:
+                [vx, vy, x0, y0] = cv2.fitLine(largest, cv2.DIST_L2, 0, 0.01, 0.01)
+                angle = np.arctan2(vy, vx) * 180 / np.pi
+                # Slashes are typically angled between 30-60 degrees
+                if 20 < abs(angle) < 70:
+                    return True
+            except:
+                pass
+        
+        return False
     
     def is_loaded(self) -> bool:
         """Check if model is loaded."""
