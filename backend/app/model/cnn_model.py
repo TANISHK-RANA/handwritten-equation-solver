@@ -1,9 +1,10 @@
 """
 CNN Model Architecture for Handwritten Character Recognition
 
-This model recognizes 14 classes:
+This model recognizes 18 classes:
 - Digits: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
-- Operators: +, -, *, /
+- Basic Operators: +, -, *, /
+- Advanced: (, ), ^, √
 """
 
 import tensorflow as tf
@@ -11,7 +12,8 @@ from tensorflow.keras import layers, models, regularizers
 
 
 # Class labels mapping
-CLASS_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', '*', '/']
+# Index 0-9: digits, 10-13: basic operators, 14-17: advanced symbols
+CLASS_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', '*', '/', '(', ')', '^', '√']
 NUM_CLASSES = len(CLASS_LABELS)
 INPUT_SHAPE = (28, 28, 1)
 

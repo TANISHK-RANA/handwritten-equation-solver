@@ -3,7 +3,7 @@ Dataset loading and preparation for CNN training.
 
 Handles:
 - MNIST dataset for digits (0-9)
-- Custom/synthetic operator dataset (+, -, *, /)
+- Custom/synthetic operator dataset (+, -, *, /, (, ), ^, √)
 - Combining datasets into a unified training set
 """
 
@@ -15,8 +15,9 @@ import tensorflow as tf
 from tensorflow.keras.utils import to_categorical
 
 
-# Class labels
-CLASS_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', '*', '/']
+# Class labels - 18 classes total
+# 0-9: digits, 10-13: basic operators, 14-17: advanced symbols
+CLASS_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', '*', '/', '(', ')', '^', '√']
 NUM_CLASSES = len(CLASS_LABELS)
 
 # Data directory
@@ -48,7 +49,7 @@ def load_mnist() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 
 def generate_synthetic_operators(num_samples_per_class: int = 6000) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Generate synthetic operator symbols (+, -, *, /).
+    Generate synthetic operator symbols (+, -, *, /, (, ), ^, √).
     
     Creates images with various styles, sizes, and positions to simulate
     handwritten operators.
@@ -63,8 +64,9 @@ def generate_synthetic_operators(num_samples_per_class: int = 6000) -> Tuple[np.
     
     print(f"Generating synthetic operators ({num_samples_per_class} per class)...")
     
-    operators = ['+', '-', '*', '/']
-    operator_labels = [10, 11, 12, 13]  # Labels 10-13 for operators
+    # All operators including new ones
+    operators = ['+', '-', '*', '/', '(', ')', '^', '√']
+    operator_labels = [10, 11, 12, 13, 14, 15, 16, 17]  # Labels 10-17 for operators
     
     all_images = []
     all_labels = []
@@ -114,6 +116,46 @@ def generate_synthetic_operators(num_samples_per_class: int = 6000) -> Tuple[np.
                 cv2.line(img, (center_x + length, center_y - length), 
                         (center_x - length, center_y + length), 255, thickness)
             
+            elif op == '(':
+                # Left parenthesis - curved arc
+                height = int(20 * size)
+                width = int(8 * size)
+                # Draw arc for left parenthesis
+                cv2.ellipse(img, (center_x + width//2, center_y), (width, height), 
+                           0, 110, 250, 255, thickness)
+            
+            elif op == ')':
+                # Right parenthesis - curved arc
+                height = int(20 * size)
+                width = int(8 * size)
+                # Draw arc for right parenthesis
+                cv2.ellipse(img, (center_x - width//2, center_y), (width, height), 
+                           0, -70, 70, 255, thickness)
+            
+            elif op == '^':
+                # Caret/exponent symbol - like an inverted V
+                length = int(8 * size)
+                # Left line going up
+                cv2.line(img, (center_x - length, center_y + length//2), 
+                        (center_x, center_y - length//2), 255, thickness)
+                # Right line going down
+                cv2.line(img, (center_x, center_y - length//2), 
+                        (center_x + length, center_y + length//2), 255, thickness)
+            
+            elif op == '√':
+                # Square root symbol
+                height = int(16 * size)
+                width = int(12 * size)
+                # Draw the checkmark part (bottom left)
+                cv2.line(img, (center_x - width, center_y), 
+                        (center_x - width//3, center_y + height//3), 255, thickness)
+                # Draw the main diagonal going up
+                cv2.line(img, (center_x - width//3, center_y + height//3), 
+                        (center_x, center_y - height//2), 255, thickness)
+                # Draw the horizontal top line
+                cv2.line(img, (center_x, center_y - height//2), 
+                        (center_x + width, center_y - height//2), 255, thickness)
+            
             # Add random noise
             noise = np.random.normal(0, 5, img.shape).astype(np.int16)
             img = np.clip(img.astype(np.int16) + noise, 0, 255).astype(np.uint8)
@@ -130,7 +172,7 @@ def generate_synthetic_operators(num_samples_per_class: int = 6000) -> Tuple[np.
     images = images.reshape(-1, 28, 28, 1)
     labels = np.array(all_labels)
     
-    print(f"Generated {len(images)} operator samples")
+    print(f"Generated {len(images)} operator samples (8 classes)")
     
     return images, labels
 

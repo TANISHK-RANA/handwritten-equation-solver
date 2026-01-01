@@ -6,17 +6,18 @@ A machine learning application that recognizes and solves handwritten mathematic
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.10+-orange)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green)
 ![React](https://img.shields.io/badge/React-18+-blue)
-![Accuracy](https://img.shields.io/badge/Accuracy-99.49%25-brightgreen)
+![Accuracy](https://img.shields.io/badge/Accuracy-99.22%25-brightgreen)
 
 ## Overview
 
-This project provides a web-based interface where users can draw handwritten mathematical equations and get instant results. The system uses a Convolutional Neural Network (CNN) trained on the MNIST dataset (for digits 0-9) and synthetic operator symbols (+, -, *, /) to recognize 14 different characters with **99.49% accuracy**.
+This project provides a web-based interface where users can draw handwritten mathematical equations and get instant results. The system uses a Convolutional Neural Network (CNN) trained on the MNIST dataset (for digits 0-9) and synthetic operator symbols to recognize **18 different characters** with **99.22% accuracy**.
 
 ### Key Features
 
 - **Drawing Canvas** - Draw equations directly in the browser with mouse or touch support
-- **CNN Recognition** - Deep learning model trained on 70,000+ images
-- **14 Class Classification** - Digits (0-9) and operators (+, -, *, /)
+- **CNN Recognition** - Deep learning model trained on 108,000+ images
+- **18 Class Classification** - Digits (0-9), operators (+, -, *, /), brackets ( ), exponent (^), and square root (√)
+- **Advanced Math Support** - Brackets for grouping, exponentiation (2^3=8), and square roots (√9=3)
 - **Real-time Results** - Instant equation solving with confidence scores
 - **Responsive Design** - Works on desktop, tablet, and mobile devices
 - **Pre-trained Model Included** - No training required to get started
@@ -215,7 +216,7 @@ VITE v4.x.x  ready in xxx ms
 
 ## Optional: Retrain the Model
 
-The repository includes a **pre-trained model** (`backend/models/equation_solver_model.h5`) with 99.49% accuracy. Training is NOT required for normal use.
+The repository includes a **pre-trained model** (`backend/models/equation_solver_model.h5`) with 99.22% accuracy on 18 classes. Training is NOT required for normal use.
 
 If you want to retrain the model:
 
@@ -365,11 +366,11 @@ Input Layer: 28x28x1 (grayscale image)
 │ Flatten                                      │
 │ Dense(256) → BatchNorm → ReLU → Dropout(0.5)│
 │ Dense(128) → BatchNorm → ReLU → Dropout(0.5)│
-│ Dense(14) → Softmax                          │
+│ Dense(18) → Softmax                          │
 └─────────────────────────────────────────────┘
     │
     ▼
-Output: 14 classes [0-9, +, -, *, /]
+Output: 18 classes [0-9, +, -, *, /, (, ), ^, √]
 ```
 
 ### Training Results
@@ -377,20 +378,48 @@ Output: 14 classes [0-9, +, -, *, /]
 | Class | Accuracy | Samples |
 |-------|----------|---------|
 | 0 | 99.59% | 980 |
-| 1 | 99.38% | 1135 |
-| 2 | 99.71% | 1032 |
-| 3 | 99.80% | 1010 |
-| 4 | 99.08% | 982 |
-| 5 | 99.33% | 892 |
-| 6 | 98.85% | 958 |
-| 7 | 99.22% | 1028 |
-| 8 | 99.69% | 974 |
-| 9 | 99.31% | 1009 |
-| + | 100.00% | 452 |
-| - | 100.00% | 473 |
-| * | 100.00% | 442 |
-| / | 100.00% | 433 |
-| **Overall** | **99.49%** | **11,800** |
+| 1 | 99.12% | 1135 |
+| 2 | 99.52% | 1032 |
+| 3 | 99.31% | 1010 |
+| 4 | 99.29% | 982 |
+| 5 | 99.44% | 892 |
+| 6 | 98.75% | 958 |
+| 7 | 99.32% | 1028 |
+| 8 | 99.49% | 974 |
+| 9 | 99.50% | 1009 |
+| + | 100.00% | 600 |
+| - | 100.00% | 600 |
+| * | 100.00% | 600 |
+| / | 100.00% | 600 |
+| ( | 96.83% | 600 |
+| ) | 97.00% | 600 |
+| ^ | 99.67% | 600 |
+| √ | 99.17% | 600 |
+| **Overall** | **99.22%** | **13,800** |
+
+---
+
+## Usage Tips
+
+### How to Draw Symbols
+
+| Symbol | How to Draw | Example |
+|--------|-------------|---------|
+| `+` | Draw a plus sign | `3+5` |
+| `-` | Draw a horizontal line | `8-2` |
+| `*` | Draw an asterisk or X shape | `4*3` |
+| `/` | Draw a diagonal line from top-right to bottom-left | `9/3` |
+| `(` | Draw a curved line opening to the right (like letter C) | `(2+3)` |
+| `)` | Draw a curved line opening to the left (backwards C) | `(2+3)*4` |
+| `^` | Draw an inverted V (caret symbol) | `2^3` = 8 |
+| `√` | Draw a checkmark with a horizontal line on top | `√9` = 3 |
+
+### Example Equations
+
+- **Basic**: `5+3`, `12-7`, `6*4`, `15/3`
+- **With Brackets**: `(2+3)*4` = 20
+- **Exponentiation**: `2^3` = 8, `5^2` = 25
+- **Square Root**: `√16` = 4, `√9+1` = 4
 
 ---
 
