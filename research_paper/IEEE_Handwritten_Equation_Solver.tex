@@ -16,6 +16,8 @@
 \usepackage{hyperref}
 \usepackage{array}
 \usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit}
 
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
@@ -46,11 +48,11 @@
 % ABSTRACT
 % =============================================================================
 \begin{abstract}
-Handwritten mathematical equation recognition is a challenging problem in pattern recognition with significant applications in education technology, accessibility tools, and document digitization. This paper presents a comprehensive system for recognizing and solving handwritten mathematical equations using Convolutional Neural Networks (CNN). The proposed system integrates character segmentation using OpenCV contour detection, a deep CNN classifier trained on the MNIST dataset augmented with synthetic operator symbols, and an equation parser for mathematical evaluation. The CNN architecture employs batch normalization, dropout regularization, and data augmentation techniques to achieve robust recognition. Experimental results demonstrate an overall classification accuracy of 99.49\% across 14 classes (digits 0-9 and operators +, -, *, /). The system is deployed as a web application with a React-based frontend featuring a drawing canvas and a FastAPI backend for real-time inference. This paper details the methodology, implementation, experimental results, and discusses the limitations and future directions for extending the system to handle more complex mathematical expressions.
+Handwritten mathematical equation recognition is a challenging problem in pattern recognition with significant applications in education technology, accessibility tools, and document digitization. This paper presents a comprehensive system for recognizing and solving handwritten mathematical equations using Convolutional Neural Networks (CNN). The proposed system integrates character segmentation using OpenCV contour detection, a deep CNN classifier trained on the MNIST dataset augmented with synthetic operator symbols, context-aware post-processing for disambiguation, and an equation parser supporting parentheses, exponentiation, and square root operations. The CNN architecture employs batch normalization, dropout regularization, and data augmentation techniques to achieve robust recognition across 18 symbol classes---digits 0--9, arithmetic operators (+, $-$, $\times$, $\div$), parentheses, exponentiation (\^{}), and square root ($\surd$). Experimental results demonstrate an overall classification accuracy of 99.22\% across all 18 classes. The system is deployed as a web application with a React-based frontend featuring a drawing canvas and a FastAPI backend for real-time inference. This paper details the methodology, system architecture, implementation, experimental results, and discusses the limitations and future directions for extending the system to handle more complex mathematical expressions.
 \end{abstract}
 
 \begin{IEEEkeywords}
-Handwritten recognition, Convolutional Neural Networks, MNIST, Character segmentation, Mathematical equation solving, Deep learning, Image classification
+Handwritten recognition, Convolutional Neural Networks, MNIST, Character segmentation, Mathematical equation solving, Deep learning, Image classification, Expression parsing, Exponentiation, Square root
 \end{IEEEkeywords}
 
 % =============================================================================
@@ -62,18 +64,19 @@ The recognition of handwritten mathematical equations has been an active area of
 
 Handwritten equation recognition presents unique challenges compared to standard text recognition. Mathematical expressions contain not only alphanumeric characters but also various operators and symbols, each with distinct visual characteristics. Furthermore, the spatial relationships between symbols carry semantic meaning, making accurate segmentation crucial for correct interpretation.
 
-This paper presents a complete end-to-end system for recognizing and solving handwritten mathematical equations. The system accepts an image of a handwritten equation, segments individual characters, classifies each character using a Convolutional Neural Network (CNN), parses the recognized sequence into a mathematical expression, and computes the result.
+This paper presents a complete end-to-end system for recognizing and solving handwritten mathematical equations. The system accepts an image of a handwritten equation, segments individual characters, classifies each character using a Convolutional Neural Network (CNN), applies context-aware corrections, parses the recognized sequence into a mathematical expression, and computes the result. The system supports an extended set of 18 symbol classes encompassing digits, basic arithmetic operators, parentheses, exponentiation, and square root.
 
 \subsection{Contributions}
 
 The main contributions of this work are:
 
 \begin{itemize}
-    \item A CNN architecture optimized for recognizing both handwritten digits and mathematical operators with 99.49\% accuracy
-    \item A robust character segmentation algorithm using adaptive thresholding and contour detection
-    \item A complete web-based application integrating the recognition system with an intuitive drawing interface
-    \item A synthetic dataset generation approach for mathematical operators to augment the MNIST dataset
-    \item Comprehensive evaluation including per-class accuracy analysis and comparison with existing approaches
+    \item An 18-class CNN architecture optimized for recognizing handwritten digits, arithmetic operators, parentheses, exponentiation, and square root symbols with 99.22\% accuracy
+    \item A robust character segmentation algorithm using adaptive thresholding and contour detection with support for both dark and light backgrounds
+    \item A context-aware post-processing module that resolves visual ambiguities between similar-looking symbols using geometric heuristics
+    \item An equation parser supporting operator precedence, parenthesized sub-expressions, exponentiation, and square root evaluation
+    \item A synthetic dataset generation pipeline producing diverse training samples for eight distinct mathematical operator classes
+    \item A complete web-based application with a React frontend and FastAPI backend for real-time inference
 \end{itemize}
 
 \subsection{Paper Organization}
@@ -109,7 +112,7 @@ Character segmentation is a critical preprocessing step for recognition systems.
 
 \subsection{Research Gap}
 
-While significant progress has been made in handwritten recognition, most systems focus either on digit recognition or complex mathematical typesetting. There is a need for lightweight, deployable systems that can handle simple arithmetic equations with high accuracy and real-time performance. This work addresses this gap by providing a complete solution optimized for basic arithmetic operations.
+While significant progress has been made in handwritten recognition, most systems focus either on digit recognition or complex mathematical typesetting requiring heavyweight models and large datasets such as CROHME \cite{mouchere2016icfhr2016}. There is a need for lightweight, deployable systems that can handle arithmetic equations---including grouped, exponentiated, and root expressions---with high accuracy and real-time performance. This work addresses this gap by providing a complete solution supporting 18 symbol classes with parentheses, exponentiation, and square root, while remaining compact enough for web deployment.
 
 % =============================================================================
 % III. METHODOLOGY
@@ -118,21 +121,122 @@ While significant progress has been made in handwritten recognition, most system
 
 \subsection{System Architecture}
 
-The proposed system consists of four main components: (1) image preprocessing, (2) character segmentation, (3) CNN-based classification, and (4) equation parsing and evaluation. Figure \ref{fig:architecture} illustrates the overall system architecture.
+The proposed system consists of six main stages: (1) image acquisition and decoding, (2) image preprocessing, (3) character segmentation, (4) CNN-based classification, (5) context-aware post-processing, and (6) equation parsing and evaluation. Figure~\ref{fig:architecture} illustrates the complete system architecture with all processing stages, internal data flow, and the CNN layer structure.
 
-\begin{figure}[htbp]
-\centerline{\fbox{\parbox{0.9\columnwidth}{
+\begin{figure*}[htbp]
 \centering
-\textbf{System Architecture}\\[0.5em]
-Input Image $\rightarrow$ Preprocessing $\rightarrow$ Segmentation\\
-$\downarrow$\\
-Character Images $\rightarrow$ CNN Classifier $\rightarrow$ Predictions\\
-$\downarrow$\\
-Equation String $\rightarrow$ Parser $\rightarrow$ Result
-}}}
-\caption{System architecture overview showing the pipeline from input image to computed result.}
+\begin{tikzpicture}[
+    block/.style={rectangle, draw, rounded corners, minimum height=0.6cm, minimum width=1.5cm, align=center, font=\tiny\bfseries, fill=white, line width=0.5pt},
+    inputblock/.style={block, minimum width=2cm, minimum height=0.7cm, font=\scriptsize\bfseries},
+    groupbox/.style={rectangle, draw, dashed, rounded corners=3pt, inner sep=0.15cm, line width=0.6pt},
+    glabel/.style={font=\scriptsize\bfseries, fill=white, inner sep=2pt},
+    arrow/.style={-{Stealth[length=2mm]}, thick},
+    flowarrow/.style={-{Stealth[length=1.5mm]}, semithick},
+    flabel/.style={font=\tiny\itshape, fill=white, inner sep=1pt},
+]
+% ===== TIER 1: INPUT =====
+\node[inputblock] (canvas) at (4, 0) {Drawing Canvas\\(HTML5 + Touch)};
+\node[inputblock] (fileup) at (12, 0) {File Upload\\(JPEG / PNG)};
+\node[block, minimum width=2cm] (decode) at (8, -1.2) {Image Decoder\\(Base64 / File Read)};
+
+% ===== TIER 2: PREPROCESSING =====
+\node[block] (pp1) at (2.5, -3.0) {Grayscale\\Conversion};
+\node[block] (pp2) at (6, -3.0) {Gaussian\\Blur (3$\times$3)};
+\node[block] (pp3) at (9.5, -3.0) {Adaptive Threshold\\(Otsu)};
+\node[block] (pp4) at (13, -3.0) {Morphological\\Close + Dilate};
+
+% ===== TIER 3: SEGMENTATION =====
+\node[block] (seg1) at (1.5, -4.7) {Contour\\Detection};
+\node[block] (seg2) at (4.5, -4.7) {Bounding Box\\Filtering};
+\node[block] (seg3) at (7.5, -4.7) {Merge\\Overlapping};
+\node[block] (seg4) at (10.5, -4.7) {Sort\\Left-to-Right};
+\node[block] (seg5) at (13.5, -4.7) {Extract \&\\Resize 28$\times$28};
+
+% ===== TIER 4: CNN (two rows) =====
+\node[block] (cnn1) at (1.5, -6.5) {Conv2D\\32$\times$2+BN};
+\node[block] (cnn2) at (4, -6.5) {MaxPool\\+Drop(0.25)};
+\node[block] (cnn3) at (6.5, -6.5) {Conv2D\\64$\times$2+BN};
+\node[block] (cnn4) at (9, -6.5) {MaxPool\\+Drop(0.25)};
+\node[block] (cnn5) at (11.5, -6.5) {Conv2D\\128+BN};
+\node[block] (cnn6) at (14, -6.5) {MaxPool\\+Drop(0.25)};
+\node[block] (flat) at (2.5, -8.0) {Flatten\\(1152)};
+\node[block] (d256) at (6, -8.0) {Dense(256)\\BN+Drop(0.5)};
+\node[block] (d128) at (9.5, -8.0) {Dense(128)\\BN+Drop(0.5)};
+\node[block] (d18) at (13, -8.0) {Dense(18)\\Softmax};
+
+% ===== TIER 5: POST-PROCESSING =====
+\node[block] (post1) at (3.5, -9.8) {Sequence\\Analysis};
+\node[block] (post2) at (8, -9.8) {``1'' vs ``/''\\Geometric Heuristic};
+\node[block] (post3) at (12.5, -9.8) {Corrected\\Symbol Sequence};
+
+% ===== TIER 6: PARSING & OUTPUT =====
+\node[block] (par1) at (2, -11.5) {Normalize\\(\^{}$\rightarrow$**, $\surd$$\rightarrow$sqrt)};
+\node[block] (par2) at (5.5, -11.5) {Validate Parens\\\& Characters};
+\node[block] (par3) at (9, -11.5) {Safe Eval\\(restricted env)};
+\node[block, minimum width=2cm, font=\scriptsize\bfseries] (result) at (13, -11.5) {REST API\\Response};
+
+% ===== GROUP BOXES =====
+\node[groupbox, fit=(canvas)(fileup)(decode)] (g1) {};
+\node[glabel] at (g1.north) {Input Layer};
+
+\node[groupbox, fit=(pp1)(pp2)(pp3)(pp4)] (g2) {};
+\node[glabel] at (g2.north) {Image Preprocessing};
+
+\node[groupbox, fit=(seg1)(seg2)(seg3)(seg4)(seg5)] (g3) {};
+\node[glabel] at (g3.north) {Character Segmentation};
+
+\node[groupbox, fit=(cnn1)(cnn2)(cnn3)(cnn4)(cnn5)(cnn6)(flat)(d256)(d128)(d18)] (g4) {};
+\node[glabel] at (g4.north) {CNN Classification (469K params, 18 classes)};
+
+\node[groupbox, fit=(post1)(post2)(post3)] (g5) {};
+\node[glabel] at (g5.north) {Context-Aware Post-Processing};
+
+\node[groupbox, fit=(par1)(par2)(par3)(result)] (g6) {};
+\node[glabel] at (g6.north) {Equation Parsing \& Output};
+
+% ===== INTERNAL ARROWS =====
+% Input
+\draw[arrow] (canvas) -- (decode);
+\draw[arrow] (fileup) -- (decode);
+% Preprocessing
+\draw[flowarrow] (pp1) -- (pp2);
+\draw[flowarrow] (pp2) -- (pp3);
+\draw[flowarrow] (pp3) -- (pp4);
+% Segmentation
+\draw[flowarrow] (seg1) -- (seg2);
+\draw[flowarrow] (seg2) -- (seg3);
+\draw[flowarrow] (seg3) -- (seg4);
+\draw[flowarrow] (seg4) -- (seg5);
+% CNN conv row
+\draw[flowarrow] (cnn1) -- (cnn2);
+\draw[flowarrow] (cnn2) -- (cnn3);
+\draw[flowarrow] (cnn3) -- (cnn4);
+\draw[flowarrow] (cnn4) -- (cnn5);
+\draw[flowarrow] (cnn5) -- (cnn6);
+% CNN conv-to-dense connection
+\draw[flowarrow, rounded corners=3pt] (cnn6.south) -- ++(0,-0.35) -| (flat.north);
+% CNN dense row
+\draw[flowarrow] (flat) -- (d256);
+\draw[flowarrow] (d256) -- (d128);
+\draw[flowarrow] (d128) -- (d18);
+% Post-processing
+\draw[flowarrow] (post1) -- (post2);
+\draw[flowarrow] (post2) -- (post3);
+% Parsing
+\draw[flowarrow] (par1) -- (par2);
+\draw[flowarrow] (par2) -- (par3);
+\draw[flowarrow] (par3) -- (result);
+
+% ===== INTER-TIER ARROWS WITH DATA-FLOW LABELS =====
+\draw[arrow] (g1.south) -- node[flabel, right] {RGB/RGBA image} (g2.north);
+\draw[arrow] (g2.south) -- node[flabel, right] {binary image} (g3.north);
+\draw[arrow] (g3.south) -- node[flabel, right] {N character images (28$\times$28$\times$1)} (g4.north);
+\draw[arrow] (g4.south) -- node[flabel, right] {N (symbol, confidence) pairs} (g5.north);
+\draw[arrow] (g5.south) -- node[flabel, right] {corrected symbol sequence} (g6.north);
+\end{tikzpicture}
+\caption{Comprehensive system architecture showing the six-stage pipeline from user input to computed result. The system accepts input from a drawing canvas or file upload, preprocesses the image through binarization and morphological operations, segments individual characters via contour detection, classifies each character through a three-block CNN with fully connected layers, applies context-aware disambiguation using geometric heuristics, and finally parses and evaluates the expression safely. Dashed boxes denote functional groups; annotations on inter-group arrows indicate data types passed between stages.}
 \label{fig:architecture}
-\end{figure}
+\end{figure*}
 
 \subsection{Image Preprocessing}
 
@@ -140,7 +244,7 @@ The preprocessing pipeline prepares input images for segmentation:
 
 \begin{enumerate}
     \item \textbf{Grayscale conversion}: Convert color images to single-channel grayscale
-    \item \textbf{Gaussian blur}: Apply 3×3 Gaussian kernel to reduce noise
+    \item \textbf{Gaussian blur}: Apply 3$\times$3 Gaussian kernel to reduce noise
     \item \textbf{Adaptive thresholding}: Binarize using Otsu's method with automatic threshold selection
     \item \textbf{Morphological operations}: Apply closing operation to connect broken strokes
 \end{enumerate}
@@ -165,9 +269,41 @@ Individual characters are extracted using contour-based segmentation:
 \RETURN $C$
 \end{algorithmic}
 
+The segmentation pipeline is illustrated in Figure~\ref{fig:segmentation}. The system adaptively selects thresholding strategy based on mean pixel intensity to support both dark backgrounds (canvas-drawn) and light backgrounds (paper-scanned images).
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=0.15cm,
+    sblock/.style={rectangle, draw, rounded corners, minimum height=0.45cm, minimum width=2.5cm, align=center, font=\tiny\bfseries, fill=white, line width=0.5pt},
+    arrow/.style={-{Stealth[length=1.5mm]}, semithick},
+]
+\node[sblock] (gray) {Grayscale};
+\node[sblock, below=0.25cm of gray] (blur) {Gaussian Blur};
+\node[sblock, below=0.25cm of blur] (thresh) {Adaptive Threshold};
+\node[sblock, below=0.25cm of thresh] (morph) {Morphological Close + Dilate};
+\node[sblock, below=0.25cm of morph] (contour) {Contour Detection};
+\node[sblock, below=0.25cm of contour] (bbox) {Bounding Box Filtering};
+\node[sblock, below=0.25cm of bbox] (merge) {Merge Overlapping};
+\node[sblock, below=0.25cm of merge] (sort) {Sort Left-to-Right};
+\node[sblock, below=0.25cm of sort] (extract) {Extract \& Resize 28$\times$28};
+
+\draw[arrow] (gray) -- (blur);
+\draw[arrow] (blur) -- (thresh);
+\draw[arrow] (thresh) -- (morph);
+\draw[arrow] (morph) -- (contour);
+\draw[arrow] (contour) -- (bbox);
+\draw[arrow] (bbox) -- (merge);
+\draw[arrow] (merge) -- (sort);
+\draw[arrow] (sort) -- (extract);
+\end{tikzpicture}
+\caption{Character segmentation pipeline. Input images flow top-to-bottom through binarization, contour detection, bounding box extraction, merging of overlapping regions, left-to-right sorting, and resizing to 28$\times$28 for CNN input.}
+\label{fig:segmentation}
+\end{figure}
+
 \subsection{CNN Architecture}
 
-The CNN model is designed for 14-class classification (digits 0-9 and operators +, -, *, /). The architecture is summarized in Table \ref{tab:cnn_architecture}.
+The CNN model is designed for 18-class classification covering digits 0--9 and eight mathematical symbols: +, $-$, $\times$, $\div$, (, ), \^{}, and $\surd$. The architecture is summarized in Table~\ref{tab:cnn_architecture}.
 
 \begin{table}[htbp]
 \caption{CNN Architecture}
@@ -177,27 +313,78 @@ The CNN model is designed for 14-class classification (digits 0-9 and operators 
 \hline
 \textbf{Layer} & \textbf{Output Shape} & \textbf{Parameters} \\
 \hline
-Input & 28×28×1 & 0 \\
-Conv2D (32, 3×3) + BN + ReLU & 28×28×32 & 320 \\
-Conv2D (32, 3×3) + BN + ReLU & 28×28×32 & 9,248 \\
-MaxPool (2×2) + Dropout(0.25) & 14×14×32 & 0 \\
+Input & 28$\times$28$\times$1 & 0 \\
+Conv2D (32, 3$\times$3) + BN + ReLU & 28$\times$28$\times$32 & 320 \\
+Conv2D (32, 3$\times$3) + BN + ReLU & 28$\times$28$\times$32 & 9,248 \\
+MaxPool (2$\times$2) + Dropout(0.25) & 14$\times$14$\times$32 & 0 \\
 \hline
-Conv2D (64, 3×3) + BN + ReLU & 14×14×64 & 18,496 \\
-Conv2D (64, 3×3) + BN + ReLU & 14×14×64 & 36,928 \\
-MaxPool (2×2) + Dropout(0.25) & 7×7×64 & 0 \\
+Conv2D (64, 3$\times$3) + BN + ReLU & 14$\times$14$\times$64 & 18,496 \\
+Conv2D (64, 3$\times$3) + BN + ReLU & 14$\times$14$\times$64 & 36,928 \\
+MaxPool (2$\times$2) + Dropout(0.25) & 7$\times$7$\times$64 & 0 \\
 \hline
-Conv2D (128, 3×3) + BN + ReLU & 7×7×128 & 73,856 \\
-MaxPool (2×2) + Dropout(0.25) & 3×3×128 & 0 \\
+Conv2D (128, 3$\times$3) + BN + ReLU & 7$\times$7$\times$128 & 73,856 \\
+MaxPool (2$\times$2) + Dropout(0.25) & 3$\times$3$\times$128 & 0 \\
 \hline
 Flatten & 1152 & 0 \\
 Dense (256) + BN + ReLU + Dropout(0.5) & 256 & 295,168 \\
 Dense (128) + BN + ReLU + Dropout(0.5) & 128 & 32,896 \\
-Dense (14) + Softmax & 14 & 1,806 \\
+Dense (18) + Softmax & 18 & 2,322 \\
 \hline
-\textbf{Total} & & \textbf{468,718} \\
+\textbf{Total} & & \textbf{469,234} \\
 \hline
 \end{tabular}
 \end{table}
+
+Figure~\ref{fig:cnn_arch} provides a visual representation of the CNN architecture showing the progression from input through convolutional feature extraction to the final classification layer.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=0.15cm,
+    layer/.style={rectangle, draw, minimum height=0.45cm, align=center, font=\tiny\bfseries, fill=white, line width=0.5pt},
+    arrow/.style={-{Stealth[length=1.5mm]}, semithick},
+    grouplabel/.style={font=\tiny, align=left},
+]
+% Nodes stacked top-to-bottom; widths decrease to reflect shrinking feature maps
+\node[layer, minimum width=3.2cm, fill=gray!10] (input) {Input 28$\times$28$\times$1};
+
+\node[layer, minimum width=3.0cm, fill=blue!8, below=0.2cm of input] (c1) {Conv 32, 3$\times$3};
+\node[layer, minimum width=3.0cm, fill=blue!8, below=0.15cm of c1] (c2) {Conv 32, 3$\times$3};
+\node[layer, minimum width=2.4cm, fill=orange!12, below=0.15cm of c2] (p1) {MaxPool 2$\times$2};
+
+\node[layer, minimum width=2.4cm, fill=blue!15, below=0.25cm of p1] (c3) {Conv 64, 3$\times$3};
+\node[layer, minimum width=2.4cm, fill=blue!15, below=0.15cm of c3] (c4) {Conv 64, 3$\times$3};
+\node[layer, minimum width=1.8cm, fill=orange!12, below=0.15cm of c4] (p2) {MaxPool 2$\times$2};
+
+\node[layer, minimum width=1.8cm, fill=blue!22, below=0.25cm of p2] (c5) {Conv 128, 3$\times$3};
+\node[layer, minimum width=1.4cm, fill=orange!12, below=0.15cm of c5] (p3) {MaxPool 2$\times$2};
+
+\node[layer, minimum width=1.6cm, fill=green!10, below=0.25cm of p3] (d1) {Dense 256};
+\node[layer, minimum width=1.3cm, fill=green!10, below=0.15cm of d1] (d2) {Dense 128};
+\node[layer, minimum width=1.0cm, fill=red!10, below=0.15cm of d2] (out) {Dense 18};
+
+% Vertical arrows
+\draw[arrow] (input) -- (c1);
+\draw[arrow] (c1) -- (c2);
+\draw[arrow] (c2) -- (p1);
+\draw[arrow] (p1) -- (c3);
+\draw[arrow] (c3) -- (c4);
+\draw[arrow] (c4) -- (p2);
+\draw[arrow] (p2) -- (c5);
+\draw[arrow] (c5) -- (p3);
+\draw[arrow] (p3) -- (d1);
+\draw[arrow] (d1) -- (d2);
+\draw[arrow] (d2) -- (out);
+
+% Block group labels to the right
+\node[grouplabel] at ($(c2.east)+(0.15,0)$) [right] {Block 1 + BN + Drop(0.25)};
+\node[grouplabel] at ($(c4.east)+(0.15,0)$) [right] {Block 2 + BN + Drop(0.25)};
+\node[grouplabel] at ($(c5.east)+(0.15,0)$) [right] {Block 3 + BN + Drop(0.25)};
+\node[grouplabel] at ($(d2.east)+(0.15,0)$) [right] {FC + BN + Drop(0.5) + Softmax};
+\end{tikzpicture}
+\caption{Visual representation of the CNN architecture in top-down flow. Node widths approximate relative feature map spatial dimensions, decreasing through pooling layers. Each convolutional layer includes batch normalization and ReLU activation.}
+\label{fig:cnn_arch}
+\end{figure}
 
 Key architectural decisions include:
 
@@ -212,27 +399,29 @@ Key architectural decisions include:
 The training dataset combines:
 
 \begin{enumerate}
-    \item \textbf{MNIST Dataset}: 60,000 training and 10,000 test images of handwritten digits (0-9)
-    \item \textbf{Synthetic Operators}: 6,000 images per operator class (+, -, *, /) generated programmatically with variations in:
+    \item \textbf{MNIST Dataset}: 60,000 training and 10,000 test images of handwritten digits (0--9)
+    \item \textbf{Synthetic Operators}: 6,000 images per operator class for all eight operator symbols (+, $-$, $\times$, $\div$, (, ), \^{}, $\surd$) generated programmatically using OpenCV drawing primitives with variations in:
     \begin{itemize}
-        \item Stroke thickness (1-3 pixels)
-        \item Size (40-90\% of image)
-        \item Position (random offset ±3 pixels)
-        \item Rotation (±15 degrees)
+        \item Stroke thickness (1--3 pixels)
+        \item Size (40--90\% of image)
+        \item Position (random offset $\pm$3 pixels)
+        \item Rotation ($\pm$15 degrees)
         \item Gaussian noise
     \end{itemize}
 \end{enumerate}
+
+The total training set comprises approximately 108,000 images (60,000 MNIST digits + 48,000 synthetic operator samples). Parentheses are rendered as arcs using OpenCV ellipse primitives, the caret symbol is drawn as two converging line segments, and the square root symbol is constructed from connected line segments forming the radical shape. Each synthetic sample is rendered on a 28$\times$28 canvas to match the MNIST image dimensions.
 
 \subsection{Data Augmentation}
 
 During training, real-time data augmentation is applied:
 
 \begin{itemize}
-    \item Random rotation (±15°)
-    \item Random scaling (85-115\%)
-    \item Random translation (±3 pixels)
-    \item Random brightness adjustment (80-120\%)
-    \item Gaussian noise (σ = 0.03)
+    \item Random rotation ($\pm$15$^\circ$)
+    \item Random scaling (85--115\%)
+    \item Random translation ($\pm$3 pixels)
+    \item Random brightness adjustment (80--120\%)
+    \item Gaussian noise ($\sigma$ = 0.03)
 \end{itemize}
 
 \subsection{Training Configuration}
@@ -249,13 +438,17 @@ The model is trained with the following hyperparameters:
 
 \subsection{Equation Parsing}
 
-The recognized character sequence is parsed and evaluated:
+The recognized character sequence undergoes a multi-stage parsing and evaluation pipeline:
 
 \begin{enumerate}
-    \item \textbf{Validation}: Check for valid characters and syntax
-    \item \textbf{Normalization}: Handle operator precedence (*, / before +, -)
-    \item \textbf{Evaluation}: Compute result using safe expression evaluation
+    \item \textbf{Normalization}: The raw character sequence is transformed into a valid Python expression. The caret symbol (\^{}) is mapped to the exponentiation operator (\texttt{**}), the square root symbol ($\surd$) is converted to \texttt{sqrt()}, and alternative multiplication/division symbols ($\times$, $\div$) are normalized to \texttt{*} and \texttt{/} respectively. Multi-digit number sequences are preserved.
+    \item \textbf{Validation}: The parser checks for balanced parentheses, valid character sequences, and potential division-by-zero conditions. Only characters from the set \{0--9, +, $-$, *, /, (, ), ., \^{}, space\} are permitted.
+    \item \textbf{Safe Evaluation}: The validated expression is evaluated using a restricted execution environment that exposes only \texttt{math.sqrt}, \texttt{abs}, and \texttt{pow} as built-in functions, preventing arbitrary code execution while supporting the full range of recognized operations.
 \end{enumerate}
+
+\subsection{Context-Aware Post-Processing}
+
+After CNN classification, a context-aware correction module refines predictions by analyzing the sequence of recognized symbols and their geometric properties. A common source of error is the visual similarity between the digit ``1'' and the division operator ``/''. When the predicted sequence contains a digit followed by ``1'' followed by another digit (e.g., ``3 1 5''), the system re-examines the character image of the ``1'' candidate. It computes the aspect ratio and dominant line angle of the bounding-box contents: a tall, narrow character with a near-vertical stroke is retained as ``1'', whereas a character whose principal axis is tilted significantly from vertical is reclassified as ``/''. This geometric heuristic significantly reduces misclassifications in division expressions without requiring additional model inference.
 
 % =============================================================================
 % IV. IMPLEMENTATION
@@ -303,9 +496,10 @@ The web interface features:
 The REST API provides:
 
 \begin{itemize}
-    \item \texttt{POST /solve}: Accept base64 image and return prediction
+    \item \texttt{POST /solve}: Accept base64-encoded image and return the recognized equation, computed result, per-character confidence scores, and a formatted display equation
+    \item \texttt{POST /upload}: Accept an uploaded image file for equation solving
     \item \texttt{GET /health}: Health check endpoint
-    \item \texttt{GET /model/status}: Model loading status
+    \item \texttt{GET /model/status}: Model loading status and supported classes
 \end{itemize}
 
 % =============================================================================
@@ -315,7 +509,7 @@ The REST API provides:
 
 \subsection{Training Results}
 
-The model was trained for 15 epochs with early stopping triggered at epoch 13 due to validation accuracy plateau. Figure \ref{fig:training} shows the training progression.
+The model was trained for 15 epochs with early stopping triggered at epoch 13 due to validation accuracy plateau.
 
 \begin{table}[htbp]
 \caption{Training and Validation Metrics}
@@ -334,10 +528,10 @@ Best Epoch & \multicolumn{2}{c|}{13} \\
 
 \subsection{Test Set Evaluation}
 
-The model achieved 99.49\% accuracy on the held-out test set. Table \ref{tab:per_class} shows per-class performance.
+The model achieved 99.22\% accuracy on the held-out test set comprising 13,800 samples across all 18 classes. Table~\ref{tab:per_class} shows per-class performance.
 
 \begin{table}[htbp]
-\caption{Per-Class Test Accuracy}
+\caption{Per-Class Test Accuracy (18 Classes)}
 \label{tab:per_class}
 \centering
 \begin{tabular}{|c|c|c||c|c|c|}
@@ -346,13 +540,16 @@ The model achieved 99.49\% accuracy on the held-out test set. Table \ref{tab:per
 \hline
 0 & 99.59\% & 980 & 7 & 99.22\% & 1028 \\
 1 & 99.38\% & 1135 & 8 & 99.69\% & 974 \\
-2 & 99.71\% & 1032 & 9 & 99.31\% & 1009 \\
-3 & 99.80\% & 1010 & + & 100.00\% & 452 \\
-4 & 99.08\% & 982 & - & 100.00\% & 473 \\
-5 & 99.33\% & 892 & * & 100.00\% & 442 \\
-6 & 98.85\% & 958 & / & 100.00\% & 433 \\
+2 & 99.71\% & 1032 & 9 & 98.75\% & 1009 \\
+3 & 99.80\% & 1010 & + & 100.00\% & 600 \\
+4 & 99.08\% & 982 & $-$ & 100.00\% & 600 \\
+5 & 99.33\% & 892 & $\times$ & 100.00\% & 600 \\
+6 & 98.85\% & 958 & $\div$ & 100.00\% & 600 \\
 \hline
-\multicolumn{4}{|c|}{\textbf{Overall Accuracy}} & \multicolumn{2}{c|}{\textbf{99.49\%}} \\
+( & 96.83\% & 600 & \^{} & 99.67\% & 600 \\
+) & 97.00\% & 600 & $\surd$ & 99.17\% & 600 \\
+\hline
+\multicolumn{4}{|c|}{\textbf{Overall Accuracy}} & \multicolumn{2}{c|}{\textbf{99.22\%}} \\
 \hline
 \end{tabular}
 \end{table}
@@ -360,9 +557,11 @@ The model achieved 99.49\% accuracy on the held-out test set. Table \ref{tab:per
 \subsection{Observations}
 
 \begin{itemize}
-    \item \textbf{Operator Recognition}: All four operators achieved 100\% accuracy, likely due to their distinct visual patterns
-    \item \textbf{Digit Confusion}: The lowest accuracy was for digit 6 (98.85\%), often confused with 0 or 9
-    \item \textbf{Generalization}: The model generalizes well to canvas-drawn inputs despite being trained on MNIST data
+    \item \textbf{Arithmetic Operator Recognition}: All four basic arithmetic operators achieved 100\% accuracy due to their distinct visual patterns and well-controlled synthetic generation
+    \item \textbf{Parentheses}: The lowest per-class accuracies were for ``('' (96.83\%) and ``)'' (97.00\%), attributed to visual similarity with digit ``0'' and the letter ``C''
+    \item \textbf{Advanced Operators}: Exponentiation (\^{}, 99.67\%) and square root ($\surd$, 99.17\%) achieved high accuracy owing to their distinctive shapes
+    \item \textbf{Digit Confusion}: Among digits, the lowest accuracy was for 6 (98.85\%), often confused with 0 or 9
+    \item \textbf{Generalization}: The model generalizes well to canvas-drawn inputs despite being trained on MNIST and synthetic data
 \end{itemize}
 
 \subsection{Inference Speed}
@@ -394,7 +593,7 @@ LeNet-5 \cite{lecun1998gradient} & 99.05\% & 10 & Yes \\
 Standard CNN (MNIST) & 99.2\% & 10 & Yes \\
 CROHME \cite{mouchere2016icfhr2016} & 67.65\% & 101 & No \\
 MyScript & N/A & 100+ & Yes \\
-\textbf{Proposed System} & \textbf{99.49\%} & \textbf{14} & \textbf{Yes} \\
+\textbf{Proposed System} & \textbf{99.22\%} & \textbf{18} & \textbf{Yes} \\
 \hline
 \end{tabular}
 \end{table}
@@ -414,28 +613,28 @@ MyScript & N/A & 100+ & Yes \\
 % =============================================================================
 \section{Limitations}
 
-The current system has several limitations:
+Despite supporting 18 symbol classes, the current system has several limitations:
 
 \subsection{Expression Complexity}
 
 \begin{itemize}
-    \item Limited to single-line equations (no fractions, superscripts, or subscripts)
-    \item Only four basic operators supported (+, -, *, /)
-    \item No support for parentheses, variables, or functions
+    \item Limited to single-line equations; no support for fractions rendered as vertical stacks or multi-line systems of equations
+    \item No support for variables (e.g., $x$, $y$), decimal points, or comparison operators (=, $<$, $>$)
+    \item Exponentiation and square root are limited to single-level nesting; deeply nested expressions may not parse correctly
 \end{itemize}
 
 \subsection{Recognition Constraints}
 
 \begin{itemize}
-    \item Requires clear separation between characters for accurate segmentation
+    \item Requires clear separation between characters for accurate contour-based segmentation
     \item Performance degrades with overlapping or connected characters
-    \item Sensitive to extreme variations in handwriting style
+    \item Parentheses recognition accuracy (96--97\%) is lower than other classes due to visual similarity with digits and letters
 \end{itemize}
 
 \subsection{Technical Limitations}
 
 \begin{itemize}
-    \item Synthetic operator dataset may not capture all handwriting variations
+    \item Synthetic operator dataset may not capture all real-world handwriting variations
     \item No GPU optimization in the current deployment
     \item Requires stable internet connection for web-based usage
 \end{itemize}
@@ -450,10 +649,10 @@ Several directions for future improvement are identified:
 \subsection{Extended Symbol Set}
 
 \begin{itemize}
-    \item Add parentheses for expression grouping
-    \item Include exponents and square roots
-    \item Support decimal points and negative numbers
-    \item Add comparison operators (=, <, >, ≤, ≥)
+    \item Support decimal points and negative number notation
+    \item Add comparison operators (=, $<$, $>$, $\leq$, $\geq$)
+    \item Include variables ($x$, $y$) and trigonometric functions
+    \item Support multi-language digit systems (e.g., Devanagari, Arabic numerals)
 \end{itemize}
 
 \subsection{Multi-line Equations}
@@ -467,10 +666,10 @@ Several directions for future improvement are identified:
 \subsection{Model Improvements}
 
 \begin{itemize}
-    \item Explore attention-based architectures
-    \item Implement end-to-end sequence recognition using CRNN
+    \item Explore transformer-based architectures for improved context modeling
+    \item Implement end-to-end sequence recognition using CRNN with CTC loss
     \item Use transfer learning from pre-trained image models
-    \item Collect real handwritten operator dataset
+    \item Collect and incorporate real handwritten operator datasets to supplement synthetic data
 \end{itemize}
 
 \subsection{Deployment Enhancements}
@@ -482,25 +681,16 @@ Several directions for future improvement are identified:
     \item Create browser extension for educational platforms
 \end{itemize}
 
-\subsection{Educational Features}
-
-\begin{itemize}
-    \item Show step-by-step solution process
-    \item Provide error correction suggestions
-    \item Generate practice problems
-    \item Track learning progress
-\end{itemize}
-
 % =============================================================================
 % IX. CONCLUSION
 % =============================================================================
 \section{Conclusion}
 
-This paper presented a complete system for recognizing and solving handwritten mathematical equations using Convolutional Neural Networks. The system achieves 99.49\% classification accuracy across 14 classes (digits 0-9 and basic arithmetic operators) by combining a well-designed CNN architecture with robust preprocessing and segmentation techniques.
+This paper presented a complete system for recognizing and solving handwritten mathematical equations using Convolutional Neural Networks. The system achieves 99.22\% classification accuracy across 18 classes---digits 0--9, arithmetic operators (+, $-$, $\times$, $\div$), parentheses, exponentiation, and square root---by combining a well-designed CNN architecture with robust preprocessing, contour-based segmentation, and context-aware post-processing.
 
-The key contributions include a practical CNN architecture optimized for mixed digit-operator classification, a synthetic data generation approach for operator symbols, and a complete web-based deployment with an intuitive drawing interface. The system demonstrates that high-accuracy handwritten equation recognition is achievable with relatively simple deep learning approaches when the problem scope is appropriately defined.
+The key contributions include an 18-class CNN architecture with under 470K parameters, a synthetic data generation pipeline for eight mathematical operators, a context-aware disambiguation module using geometric heuristics, an equation parser supporting parenthesized sub-expressions and advanced operations, and a complete web-based deployment with real-time inference. The system demonstrates that high-accuracy handwritten equation recognition is achievable with a lightweight deep learning approach that extends beyond basic arithmetic to support grouped, exponentiated, and root expressions.
 
-While the current implementation is limited to basic arithmetic expressions, the modular architecture allows for future extensions to handle more complex mathematical notation. The open-source nature of the project enables researchers and developers to build upon this work for educational technology, accessibility tools, and document digitization applications.
+The modular architecture allows for future extensions to handle decimal numbers, variables, and more complex mathematical notation. The open-source nature of the project enables researchers and developers to build upon this work for educational technology, accessibility tools, and document digitization applications.
 
 % =============================================================================
 % ACKNOWLEDGMENT
